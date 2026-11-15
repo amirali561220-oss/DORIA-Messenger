@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: doria-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DORIA_ENV
+        value: production
+      - key: DORIA_SECRET_KEY
+        generateValue: true
+      - key: DORIA_ALLOWED_ORIGINS
+        value: "*"
