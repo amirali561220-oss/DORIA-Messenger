@@ -24,4 +24,4 @@ jobs:
         env:
           DORIA_SECRET_KEY: ci-only-test-secret-key-12345678901234567890
           DORIA_ENV: test
-        run: pytest -q
+        run: python -m pytest -q
