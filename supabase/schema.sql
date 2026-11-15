@@ -208,16 +208,14 @@ for update to authenticated using (owner_id = (select auth.uid()))
 with check (owner_id = (select auth.uid()));
 
 -- Members can see memberships in public groups or groups they belong to.
+-- The helper is SECURITY DEFINER to avoid recursive group_members RLS evaluation.
 drop policy if exists "group_members_read_visible" on public.group_members;
 create policy "group_members_read_visible" on public.group_members
 for select to authenticated using (
   exists (
     select 1 from public.groups g
     where g.id = group_members.group_id
-      and (g.is_public or exists (
-        select 1 from public.group_members mine
-        where mine.group_id = g.id and mine.user_id = (select auth.uid())
-      ))
+      and (g.is_public or public.doria_is_group_member(g.id, (select auth.uid())))
   )
 );
 drop policy if exists "group_members_join_public" on public.group_members;
@@ -269,3 +267,8 @@ begin
     alter publication supabase_realtime add table public.group_messages;
   end if;
 end $$;
+
+revoke all on function public.doria_is_group_member(uuid, uuid) from public;
+revoke all on function public.doria_is_blocked(uuid, uuid) from public;
+grant execute on function public.doria_is_group_member(uuid, uuid) to authenticated;
+grant execute on function public.doria_is_blocked(uuid, uuid) to authenticated;
