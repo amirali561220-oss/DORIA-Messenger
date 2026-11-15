@@ -123,6 +123,34 @@ create trigger doria_group_owner_member
 after insert on public.groups
 for each row execute procedure public.doria_add_group_owner();
 
+-- Security-definer helpers avoid recursive RLS checks and enforce blocks from either side.
+create or replace function public.doria_is_group_member(p_group_id uuid, p_user_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $
+  select exists (
+    select 1 from public.group_members gm
+    where gm.group_id = p_group_id and gm.user_id = p_user_id
+  );
+$;
+
+create or replace function public.doria_is_blocked(p_first uuid, p_second uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $
+  select exists (
+    select 1 from public.blocks b
+    where (b.blocker_id = p_first and b.blocked_id = p_second)
+       or (b.blocker_id = p_second and b.blocked_id = p_first)
+  );
+$;
+
 alter table public.profiles enable row level security;
 alter table public.blocks enable row level security;
 alter table public.messages enable row level security;
@@ -156,31 +184,20 @@ drop policy if exists "messages_read_participant" on public.messages;
 create policy "messages_read_participant" on public.messages
 for select to authenticated using (
   (sender_id = (select auth.uid()) or receiver_id = (select auth.uid()))
-  and not exists (
-    select 1 from public.blocks b
-    where (b.blocker_id = messages.sender_id and b.blocked_id = messages.receiver_id)
-       or (b.blocker_id = messages.receiver_id and b.blocked_id = messages.sender_id)
-  )
+  and not public.doria_is_blocked(messages.sender_id, messages.receiver_id)
 );
 drop policy if exists "messages_send_own" on public.messages;
 create policy "messages_send_own" on public.messages
 for insert to authenticated with check (
   sender_id = (select auth.uid())
-  and not exists (
-    select 1 from public.blocks b
-    where (b.blocker_id = messages.sender_id and b.blocked_id = messages.receiver_id)
-       or (b.blocker_id = messages.receiver_id and b.blocked_id = messages.sender_id)
-  )
+  and not public.doria_is_blocked(messages.sender_id, messages.receiver_id)
 );
 
 -- Groups: public groups are discoverable; private groups are visible only to members.
 drop policy if exists "groups_read_public_or_member" on public.groups;
 create policy "groups_read_public_or_member" on public.groups
 for select to authenticated using (
-  is_public or exists (
-    select 1 from public.group_members gm
-    where gm.group_id = groups.id and gm.user_id = (select auth.uid())
-  )
+  is_public or public.doria_is_group_member(groups.id, (select auth.uid()))
 );
 drop policy if exists "groups_create_as_owner" on public.groups;
 create policy "groups_create_as_owner" on public.groups
@@ -217,17 +234,13 @@ for delete to authenticated using (user_id = (select auth.uid()));
 drop policy if exists "group_messages_read_member" on public.group_messages;
 create policy "group_messages_read_member" on public.group_messages
 for select to authenticated using (
-  exists (select 1 from public.group_members gm
-          where gm.group_id = group_messages.group_id
-            and gm.user_id = (select auth.uid()))
+  public.doria_is_group_member(group_messages.group_id, (select auth.uid()))
 );
 drop policy if exists "group_messages_send_member" on public.group_messages;
 create policy "group_messages_send_member" on public.group_messages
 for insert to authenticated with check (
   sender_id = (select auth.uid())
-  and exists (select 1 from public.group_members gm
-              where gm.group_id = group_messages.group_id
-                and gm.user_id = (select auth.uid()))
+  and public.doria_is_group_member(group_messages.group_id, (select auth.uid()))
 );
 
 -- Reports: a user can submit and inspect only their own reports.
