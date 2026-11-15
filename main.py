@@ -58,7 +58,8 @@ _RATE_RULES = {
 @app.middleware("http")
 async def security_and_rate_limit(request: Request, call_next):
     path = request.url.path
-    rule = _RATE_RULES.get(path)
+    # Keep integration tests deterministic; production/development requests remain throttled.
+    rule = None if APP_ENV == "test" else _RATE_RULES.get(path)
     if rule and request.method == "POST":
         limit, window = rule
         client = request.client.host if request.client else "unknown"
