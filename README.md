@@ -1,40 +1,34 @@
-# DORIA Messenger — API starter
+# DORIA Messenger
 
-DORIA is an early-stage messaging project. The current repository contains a Python FastAPI backend, not an Android app or a production-ready public messenger.
+DORIA is an early-stage Persian messaging web app. The repository now contains a FastAPI backend and a responsive Persian web client served from the same origin.
 
-## Current features
-- Account registration and login
-- Password hashing and signed bearer tokens
-- User directory
-- One-to-one text messages
-- Basic groups and group text messages
-- User blocking and reporting endpoints
-- Health check and interactive API docs
-- Basic request throttling for login, registration and reports
-- Automated API tests and GitHub Actions test workflow
+## Included in this starter
+- Email-address + password registration and login
+- Password hashing with PBKDF2-HMAC-SHA256
+- Signed expiring bearer sessions
+- User directory and private text messages
+- Basic group creation, membership and group text messages
+- Basic block and report endpoints
+- Health endpoint and FastAPI API docs at /docs
+- Basic in-process throttling for registration, login and reports
+- GitHub Actions test workflow
 
-## Run locally
-1. Install Python 3.10 or newer.
-2. Install packages: pip install -r requirements.txt
-3. Set a private random DORIA_SECRET_KEY (at least 32 characters for production).
-4. Run: python main.py
-5. Open http://127.0.0.1:8000/docs.
+## Local run
+Python 3.10+:
+1. pip install -r requirements.txt
+2. Set DORIA_SECRET_KEY to a private random string of at least 32 characters (recommended).
+3. python main.py
+4. Open http://127.0.0.1:8000
 
-For local development only, if no secret is configured, the app creates a temporary secret at startup. Sessions will not survive a restart. Production mode refuses to start without a strong secret and explicit allowed origins.
+Tests: pytest -q
 
-## Run tests
-Run: pytest -q
+## Hosting
+The Render Blueprint is configured for a free demonstration deployment. Connect the repository to Render and create the service from the Blueprint. Free instances sleep after inactivity and their local files are ephemeral; therefore the SQLite database can be lost after restarts, redeploys or sleep. This is a test deployment only, not a durable public messenger. A reliable public launch needs a persistent PostgreSQL database or paid persistent storage, backups and monitoring.
 
-The tests use FastAPI TestClient and HTTPX.
-
-## Important limitations before public launch
-- SQLite is for development/testing; production needs PostgreSQL, migrations, backups and persistent storage.
-- The current rate limiter is per-process and is not sufficient for multiple server workers; use a shared limiter such as Redis in production.
-- Admin roles and a real moderation dashboard are not implemented; the admin reports route remains disabled.
-- Public group discovery, channels, media uploads, voice/video calls, push notifications, account recovery, device/session management and an Android client are not implemented.
-- Messages are not end-to-end encrypted. Do not use this starter for sensitive or real personal conversations.
-- Before public use, arrange an independent security review, HTTPS, monitoring, abuse response, privacy policy, data deletion/export procedures and reliable backups.
-- Never commit real API keys, passwords, signing secrets, database files or user data.
-
-## Environment
-Use .env.example as a template for hosting environment settings; do not commit a real .env file. Use a unique secret per environment.
+## Important limitations
+- Email is currently the login identifier; the app does NOT send email verification or password-reset messages yet. Do not claim an address has been verified.
+- Messages are not end-to-end encrypted. Do not use this app for private or sensitive conversations.
+- No media upload, voice/video calling, push notifications, contact sync, public group discovery, admin dashboard or Android APK yet.
+- The current SQLite database and in-memory rate limiter are suitable only for a small prototype. Production requires PostgreSQL, migrations, shared rate limiting, backups, monitoring and a security review.
+- Add a real email provider only through server-side environment secrets; never commit credentials or expose private keys in frontend code.
+- Never commit real passwords, tokens, database files or personal user data.
