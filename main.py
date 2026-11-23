@@ -121,6 +121,8 @@ def health():
 def register(x:Register):
     with db() as c:
         try:
+            if c.execute("SELECT id FROM users WHERE email=?",(x.email,)).fetchone():
+                raise HTTPException(409,"این ایمیل قبلاً ثبت شده است.")
             cols={z["name"] for z in c.execute("PRAGMA table_info(users)")}
             if "username" in cols:
                 legacy_username=x.email.split("@")[0][:18]+"_"+secrets.token_hex(3)
@@ -186,11 +188,15 @@ def group_send(gid:int,x:Msg,u=Depends(me)):
 @app.post("/blocks/{target}",status_code=201)
 def block(target:int,u=Depends(me)):
     if target==u["id"]: raise HTTPException(400,"شناسه نامعتبر است.")
-    with db() as c: c.execute("INSERT OR IGNORE INTO blocks(blocker_id,blocked_id,created_at) VALUES(?,?,?)",(u["id"],target,now()))
+    with db() as c:
+        if not c.execute("SELECT id FROM users WHERE id=?",(target,)).fetchone(): raise HTTPException(404,"کاربر پیدا نشد.")
+        c.execute("INSERT OR IGNORE INTO blocks(blocker_id,blocked_id,created_at) VALUES(?,?,?)",(u["id"],target,now()))
     return {"blocked":True}
 @app.post("/reports",status_code=201)
 def report(x:Report,u=Depends(me)):
-    with db() as c: rid=c.execute("INSERT INTO reports(reporter_id,reported_user_id,reason,details,created_at) VALUES(?,?,?,?,?)",(u["id"],x.reported_user_id,x.reason,x.details,now())).lastrowid
+    with db() as c:
+        if not c.execute("SELECT id FROM users WHERE id=?",(x.reported_user_id,)).fetchone(): raise HTTPException(404,"کاربر پیدا نشد.")
+        rid=c.execute("INSERT INTO reports(reporter_id,reported_user_id,reason,details,created_at) VALUES(?,?,?,?,?)",(u["id"],x.reported_user_id,x.reason,x.details,now())).lastrowid
     return {"report_id":rid,"status":"pending"}
 if WEB.exists(): app.mount("/",StaticFiles(directory=str(WEB),html=True),name="web")
 if __name__=="__main__":
