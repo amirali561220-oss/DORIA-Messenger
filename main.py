@@ -28,7 +28,7 @@ async def headers_and_limits(req:Request,call_next):
     if rule and req.method=="POST":
         maxn,window=rule; ip=req.client.host if req.client else "unknown"; key=(req.url.path,ip); now=time.monotonic()
         while rate[key] and now-rate[key][0]>window: rate[key].popleft()
-        if len(rate[key])>=maxn: return JSONResponse(429,{"detail":"درخواست زیاد است؛ کمی بعد تلاش کنید."})
+        if len(rate[key])>=maxn: return JSONResponse(status_code=429,content={"detail":"درخواست زیاد است؛ کمی بعد تلاش کنید."})
         rate[key].append(now)
     res=await call_next(req)
     res.headers["X-Content-Type-Options"]="nosniff"; res.headers["X-Frame-Options"]="DENY"; res.headers["Referrer-Policy"]="no-referrer"
@@ -120,7 +120,13 @@ def health():
 @app.post("/register",status_code=201)
 def register(x:Register):
     with db() as c:
-        try: uid=c.execute("INSERT INTO users(email,display_name,password_hash,created_at) VALUES(?,?,?,?)",(x.email,x.display_name,hashpw(x.password),now())).lastrowid
+        try:
+            cols={z["name"] for z in c.execute("PRAGMA table_info(users)")}
+            if "username" in cols:
+                legacy_username=x.email.split("@")[0][:18]+"_"+secrets.token_hex(3)
+                uid=c.execute("INSERT INTO users(email,username,display_name,password_hash,created_at) VALUES(?,?,?,?,?)",(x.email,legacy_username,x.display_name,hashpw(x.password),now())).lastrowid
+            else:
+                uid=c.execute("INSERT INTO users(email,display_name,password_hash,created_at) VALUES(?,?,?,?)",(x.email,x.display_name,hashpw(x.password),now())).lastrowid
         except sqlite3.IntegrityError: raise HTTPException(409,"این ایمیل قبلاً ثبت شده است.")
     return {"access_token":token(uid),"user_id":uid}
 @app.post("/login")
