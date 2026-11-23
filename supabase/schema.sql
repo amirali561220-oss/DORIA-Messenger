@@ -130,12 +130,12 @@ language sql
 stable
 security definer
 set search_path = ''
-as $
+as $$
   select exists (
     select 1 from public.group_members gm
     where gm.group_id = p_group_id and gm.user_id = p_user_id
   );
-$;
+$$;
 
 create or replace function public.doria_is_blocked(p_first uuid, p_second uuid)
 returns boolean
@@ -143,13 +143,13 @@ language sql
 stable
 security definer
 set search_path = ''
-as $
+as $$
   select exists (
     select 1 from public.blocks b
     where (b.blocker_id = p_first and b.blocked_id = p_second)
        or (b.blocker_id = p_second and b.blocked_id = p_first)
   );
-$;
+$$;
 
 alter table public.profiles enable row level security;
 alter table public.blocks enable row level security;
