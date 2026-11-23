@@ -1,6 +1,7 @@
+# Demo-only free deployment. SQLite data on free instances is ephemeral.
 services:
   - type: web
-    name: doria-api
+    name: doria-messenger
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
@@ -11,5 +12,5 @@ services:
         value: production
       - key: DORIA_SECRET_KEY
         generateValue: true
-      - key: DORIA_ALLOWED_ORIGINS
-        value: "*"
+      - key: DORIA_DB_PATH
+        value: /tmp/doria.db
