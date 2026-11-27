@@ -25,7 +25,7 @@ def test_health_and_frontend():
 def test_email_register_login_and_private_chat():
     uid1,h1=register("one@example.com")
     uid2,h2=register("two@example.com")
-    login=client.post("/login",json={"email":"ONE@example.com","password":"strong-test-pass-123"})
+    login=client.post("/login",json={"email":"ONE@example.com","password":"strong-test-pass-123","device_id":"device-one-example.com"})
     assert login.status_code==200
     sent=client.post("/messages",headers=h1,json={"receiver_id":uid2,"body":"سلام دوریا"})
     assert sent.status_code==201
@@ -82,3 +82,18 @@ def test_media_rejects_unsupported_file_type():
     _,headers=register("badmedia@example.com")
     result=client.post("/uploads",headers=headers,files={"file":("x.txt",b"hello","text/plain")})
     assert result.status_code==415
+
+
+def test_one_account_per_device_session():
+    first_id, first_headers = register("phone-first@example.com")
+    second = client.post("/login",json={"email":"phone-second@example.com","password":"strong-test-pass-123","device_id":"phone-shared-device-123456"})
+    assert second.status_code==401
+    register("phone-second@example.com")
+    second_login=client.post("/login",json={"email":"phone-second@example.com","password":"strong-test-pass-123","device_id":"device-phone-second-example.com"})
+    assert second_login.status_code==200
+    # Reusing a device identifier for a different account invalidates its previous session.
+    first_login=client.post("/login",json={"email":"phone-first@example.com","password":"strong-test-pass-123","device_id":"same-device-identifier-123456"})
+    assert first_login.status_code==200
+    old=client.post("/login",json={"email":"phone-second@example.com","password":"strong-test-pass-123","device_id":"same-device-identifier-123456"})
+    assert old.status_code==200
+    assert client.get("/me",headers={"Authorization":"Bearer "+first_login.json()["access_token"]}).status_code==401
