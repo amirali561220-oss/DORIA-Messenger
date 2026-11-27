@@ -25,8 +25,9 @@ Python 3.10+:
 اجرای تست‌ها: `pytest -q`
 
 ## میزبانی با Docker
-- ایمیج با `docker build -t doria-messenger .` ساخته می‌شود.
-- برای اجرا، مقدار محرمانه `DORIA_SECRET_KEY` را تنظیم کنید.
+- فایل `compose.yaml` آماده اجرای سرویس با Docker Compose و volume دائمی است.
+- یک فایل `.env` بسازید و در آن `DORIA_SECRET_KEY` را با یک مقدار تصادفی خصوصی (حداقل ۳۲ نویسه) تنظیم کنید؛ نمونه ساخت کلید: `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
+- اجرا: `docker compose up -d --build`؛ سپس سرویس روی پورت ۸۰۰۰ در دسترس است.
 - یک فضای ذخیره‌سازی دائمی (persistent volume) در مسیر `/data` متصل کنید. پایگاه داده در `/data/doria.db` و فایل‌های عکس/ویدئو در `/data/uploads` ذخیره می‌شوند.
 - پورت سرویس از متغیر `PORT` خوانده می‌شود (پیش‌فرض ۸۰۰۰).
 - بدون volume دائمی، داده‌ها و رسانه‌ها ممکن است با راه‌اندازی مجدد یا انتشار نسخه جدید از بین بروند.
