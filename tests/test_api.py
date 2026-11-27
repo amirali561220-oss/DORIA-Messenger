@@ -12,7 +12,8 @@ from main import app
 client = TestClient(app)
 
 def register(email):
-    r=client.post("/register",json={"email":email,"display_name":email.split("@")[0],"password":"strong-test-pass-123"})
+    device_id="device-"+email.replace("@","-")
+    r=client.post("/register",json={"email":email,"display_name":email.split("@")[0],"password":"strong-test-pass-123","device_id":device_id})
     assert r.status_code==201,r.text
     return r.json()["user_id"],{"Authorization":"Bearer "+r.json()["access_token"]}
 
