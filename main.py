@@ -4,7 +4,7 @@ from pathlib import Path
 from collections import defaultdict,deque
 from datetime import datetime,timedelta,timezone
 import jwt
-from fastapi import FastAPI,Depends,HTTPException,Request
+from fastapi import FastAPI,Depends,HTTPException,Request,UploadFile,File
 from fastapi.security import HTTPBearer,HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -12,6 +12,8 @@ from pydantic import BaseModel,Field,field_validator
 
 ROOT=Path(__file__).resolve().parent
 WEB=ROOT/"web"
+MEDIA_DIR=Path(os.getenv("DORIA_UPLOAD_DIR",str(ROOT/"uploads")))
+MEDIA_DIR.mkdir(parents=True,exist_ok=True)
 DB=os.getenv("DORIA_DB_PATH",str(ROOT/"doria.db"))
 SECRET=os.getenv("DORIA_SECRET_KEY","").strip()
 if not SECRET:
@@ -223,6 +225,43 @@ def report(x:Report,u=Depends(me)):
         if not c.execute("SELECT id FROM users WHERE id=?",(x.reported_user_id,)).fetchone(): raise HTTPException(404,"کاربر پیدا نشد.")
         rid=c.execute("INSERT INTO reports(reporter_id,reported_user_id,reason,details,created_at) VALUES(?,?,?,?,?)",(u["id"],x.reported_user_id,x.reason,x.details,now())).lastrowid
     return {"report_id":rid,"status":"pending"}
+
+@app.post("/uploads",status_code=201)
+async def upload_media(file:UploadFile=File(...),u=Depends(me)):
+    allowed={
+        "image/jpeg":("jpg",20*1024*1024,"image"),
+        "image/png":("png",20*1024*1024,"image"),
+        "image/webp":("webp",20*1024*1024,"image"),
+        "image/gif":("gif",20*1024*1024,"image"),
+        "video/mp4":("mp4",50*1024*1024,"video"),
+        "video/webm":("webm",50*1024*1024,"video"),
+        "video/quicktime":("mov",50*1024*1024,"video"),
+    }
+    spec=allowed.get(file.content_type or "")
+    if not spec: raise HTTPException(415,"فقط عکس JPEG/PNG/WEBP/GIF و ویدئوی MP4/WEBM/MOV مجاز است.")
+    ext,limit,kind=spec
+    name=secrets.token_urlsafe(24)+"."+ext
+    target=MEDIA_DIR/name
+    total=0
+    try:
+        with target.open("wb") as out:
+            while True:
+                chunk=await file.read(1024*1024)
+                if not chunk: break
+                total+=len(chunk)
+                if total>limit: raise HTTPException(413,"حجم فایل بیش از حد مجاز است.")
+                out.write(chunk)
+    except Exception:
+        target.unlink(missing_ok=True)
+        raise
+    finally:
+        await file.close()
+    if total==0:
+        target.unlink(missing_ok=True)
+        raise HTTPException(400,"فایل خالی است.")
+    return {"url":"/media/"+name,"kind":kind,"size":total}
+
+if MEDIA_DIR.exists(): app.mount("/media",StaticFiles(directory=str(MEDIA_DIR)),name="media")
 if WEB.exists(): app.mount("/",StaticFiles(directory=str(WEB),html=True),name="web")
 if __name__=="__main__":
     import uvicorn
