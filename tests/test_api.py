@@ -56,3 +56,12 @@ def test_group_chat():
     assert sent.status_code==201
     received=client.get(f"/groups/{gid}/messages",headers=headers)
     assert received.status_code==200 and received.json()[0]["body"]=="پیام گروهی"
+
+def test_rejects_blank_group_name_and_report_reason():
+    _,headers=register("validation@example.com")
+    bad_group=client.post("/groups",headers=headers,json={"name":"   "})
+    assert bad_group.status_code==422
+    _,target_headers=register("reported@example.com")
+    target=client.get("/me",headers=target_headers).json()["id"]
+    bad_report=client.post("/reports",headers=headers,json={"reported_user_id":target,"reason":"   "})
+    assert bad_report.status_code==422
