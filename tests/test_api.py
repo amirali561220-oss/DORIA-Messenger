@@ -29,7 +29,7 @@ def test_email_register_login_and_private_chat():
     assert login.status_code==200
     sent=client.post("/messages",headers=h1,json={"receiver_id":uid2,"body":"سلام دوریا"})
     assert sent.status_code==201
-    rows=client.get(f"/messages/{uid2}",headers=h2)
+    rows=client.get(f"/messages/{uid1}",headers=h2)
     assert rows.status_code==200 and rows.json()[0]["body"]=="سلام دوریا"
 
 def test_duplicate_and_invalid_registration():
