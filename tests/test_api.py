@@ -65,3 +65,20 @@ def test_rejects_blank_group_name_and_report_reason():
     target=client.get("/me",headers=target_headers).json()["id"]
     bad_report=client.post("/reports",headers=headers,json={"reported_user_id":target,"reason":"   "})
     assert bad_report.status_code==422
+
+
+def test_authenticated_media_upload_and_retrieval():
+    _,headers=register("media@example.com")
+    denied=client.post("/uploads",files={"file":("pic.png",b"fake","image/png")})
+    assert denied.status_code==401
+    uploaded=client.post("/uploads",headers=headers,files={"file":("pic.png",b"\x89PNG\r\n\x1a\nmedia-test","image/png")})
+    assert uploaded.status_code==201,uploaded.text
+    data=uploaded.json()
+    assert data["kind"]=="image" and data["url"].startswith("/media/")
+    fetched=client.get(data["url"])
+    assert fetched.status_code==200
+
+def test_media_rejects_unsupported_file_type():
+    _,headers=register("badmedia@example.com")
+    result=client.post("/uploads",headers=headers,files={"file":("x.txt",b"hello","text/plain")})
+    assert result.status_code==415
