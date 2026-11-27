@@ -107,11 +107,23 @@ class Group(BaseModel):
     name:str=Field(min_length=2,max_length=60)
     @field_validator("name")
     @classmethod
-    def group_name(cls,v): return v.strip()
+    def group_name(cls,v):
+        v=v.strip()
+        if len(v)<2: raise ValueError("نام گروه باید حداقل ۲ نویسه باشد.")
+        return v
 class Report(BaseModel):
     reported_user_id:int=Field(gt=0)
     reason:str=Field(min_length=3,max_length=80)
     details:str=Field(default="",max_length=1000)
+    @field_validator("reason")
+    @classmethod
+    def reason_ok(cls,v):
+        v=v.strip()
+        if len(v)<3: raise ValueError("دلیل گزارش باید حداقل ۳ نویسه باشد.")
+        return v
+    @field_validator("details")
+    @classmethod
+    def details_clean(cls,v): return v.strip()
 
 @app.get("/health")
 def health():
