@@ -22,6 +22,8 @@ jobs:
           pip install -r requirements.txt
       - name: Check frontend JavaScript
         run: node --check web/app.js
+      - name: Build Docker image
+        run: docker build -t doria-messenger:ci .
       - name: Run API tests
         env:
           DORIA_SECRET_KEY: ci-only-test-secret-key-12345678901234567890
