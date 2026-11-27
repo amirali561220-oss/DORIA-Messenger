@@ -3,7 +3,8 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DORIA_ENV=production \
-    DORIA_DB_PATH=/data/doria.db
+    DORIA_DB_PATH=/data/doria.db \
+    DORIA_UPLOAD_DIR=/data/uploads
 
 WORKDIR /app
 COPY requirements.txt .
