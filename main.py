@@ -1,4 +1,5 @@
 import os,re,sqlite3,hashlib,secrets,time
+from contextlib import contextmanager
 from pathlib import Path
 from collections import defaultdict,deque
 from datetime import datetime,timedelta,timezone
@@ -23,8 +24,8 @@ auth=HTTPBearer(auto_error=False)
 rate=defaultdict(deque)
 @app.middleware("http")
 async def headers_and_limits(req:Request,call_next):
-    rules={"/login":(10,300),"/register":(5,3600),"/reports":(5,3600)}
-    rule=rules.get(req.url.path)
+    rules={"/login":(10,300),"/register":(30,3600),"/reports":(10,3600)}
+    rule=None if os.getenv("DORIA_ENV")=="test" else rules.get(req.url.path)
     if rule and req.method=="POST":
         maxn,window=rule; ip=req.client.host if req.client else "unknown"; key=(req.url.path,ip); now=time.monotonic()
         while rate[key] and now-rate[key][0]>window: rate[key].popleft()
@@ -35,9 +36,21 @@ async def headers_and_limits(req:Request,call_next):
     if req.url.path.startswith(("/me","/users","/messages","/groups")): res.headers["Cache-Control"]="no-store"
     return res
 
+@contextmanager
 def db():
     Path(DB).parent.mkdir(parents=True,exist_ok=True)
-    c=sqlite3.connect(DB,timeout=20); c.row_factory=sqlite3.Row; c.execute("PRAGMA foreign_keys=ON"); c.execute("PRAGMA busy_timeout=20000"); return c
+    c=sqlite3.connect(DB,timeout=20)
+    c.row_factory=sqlite3.Row
+    c.execute("PRAGMA foreign_keys=ON")
+    c.execute("PRAGMA busy_timeout=20000")
+    try:
+        yield c
+        c.commit()
+    except Exception:
+        c.rollback()
+        raise
+    finally:
+        c.close()
 def now(): return datetime.now(timezone.utc).isoformat()
 def init():
     with db() as c:
