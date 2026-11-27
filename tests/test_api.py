@@ -28,6 +28,7 @@ def test_email_register_login_and_private_chat():
     uid2,h2=register("two@example.com")
     login=client.post("/login",json={"email":"ONE@example.com","password":"strong-test-pass-123","device_id":"device-one-example.com"})
     assert login.status_code==200
+    h1={"Authorization":"Bearer "+login.json()["access_token"]}
     sent=client.post("/messages",headers=h1,json={"receiver_id":uid2,"body":"سلام دوریا"})
     assert sent.status_code==201
     rows=client.get(f"/messages/{uid1}",headers=h2)
