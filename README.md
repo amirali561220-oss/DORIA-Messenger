@@ -1,34 +1,44 @@
 # DORIA Messenger
 
-DORIA is an early-stage Persian messaging web app. The repository now contains a FastAPI backend and a responsive Persian web client served from the same origin.
+دوریا یک پیام‌رسان فارسی تحت وب در مرحله توسعه است. Backend با FastAPI و رابط کاربری فارسی راست‌چین در همین برنامه ارائه می‌شوند.
 
-## Included in this starter
-- Email-address + password registration and login
-- Password hashing with PBKDF2-HMAC-SHA256
-- Signed expiring bearer sessions
-- User directory and private text messages
-- Basic group creation, membership and group text messages
-- Basic block and report endpoints
-- Health endpoint and FastAPI API docs at /docs
-- Basic in-process throttling for registration, login and reports
-- GitHub Actions test workflow
+## قابلیت‌های پیاده‌سازی‌شده
+- ساخت حساب با ایمیل و رمز مخصوص حساب دوریا و ورود با همان ایمیل
+- هش امن رمز با PBKDF2-HMAC-SHA256 و نشست امضاشده با زمان انقضا
+- فهرست کاربران و گفت‌وگوی خصوصی متنی
+- ساخت گروه، عضویت و گفت‌وگوی متنی گروهی
+- مسدودسازی و گزارش کاربر
+- ارسال عکس JPEG/PNG/WEBP/GIF تا ۲۰ مگابایت
+- ارسال ویدئوی MP4/WEBM/MOV تا ۵۰ مگابایت
+- ارسال موقعیت مکانی با اجازه مرورگر و لینک نقشه
+- نمایش رابط فارسی واکنش‌گرا و به‌روزرسانی دوره‌ای گفتگوها
+- بررسی سلامت سرویس در /health و مستندات API در /docs
+- تست خودکار API، بررسی نحو JavaScript و ساخت Docker در GitHub Actions
 
-## Local run
+## اجرای محلی
 Python 3.10+:
-1. pip install -r requirements.txt
-2. Set DORIA_SECRET_KEY to a private random string of at least 32 characters (recommended).
-3. python main.py
-4. Open http://127.0.0.1:8000
+1. `pip install -r requirements.txt`
+2. متغیر محیطی `DORIA_SECRET_KEY` را روی یک مقدار محرمانه تصادفی با حداقل ۳۲ نویسه قرار دهید.
+3. `python main.py`
+4. نشانی `http://127.0.0.1:8000` را باز کنید.
 
-Tests: pytest -q
+اجرای تست‌ها: `pytest -q`
 
-## Hosting
-The Render Blueprint is configured for a free demonstration deployment. Connect the repository to Render and create the service from the Blueprint. Free instances sleep after inactivity and their local files are ephemeral; therefore the SQLite database can be lost after restarts, redeploys or sleep. This is a test deployment only, not a durable public messenger. A reliable public launch needs a persistent PostgreSQL database or paid persistent storage, backups and monitoring.
+## میزبانی با Docker
+- ایمیج با `docker build -t doria-messenger .` ساخته می‌شود.
+- برای اجرا، مقدار محرمانه `DORIA_SECRET_KEY` را تنظیم کنید.
+- یک فضای ذخیره‌سازی دائمی (persistent volume) در مسیر `/data` متصل کنید. پایگاه داده در `/data/doria.db` و فایل‌های عکس/ویدئو در `/data/uploads` ذخیره می‌شوند.
+- پورت سرویس از متغیر `PORT` خوانده می‌شود (پیش‌فرض ۸۰۰۰).
+- بدون volume دائمی، داده‌ها و رسانه‌ها ممکن است با راه‌اندازی مجدد یا انتشار نسخه جدید از بین بروند.
 
-## Important limitations
-- Email is currently the login identifier; the app does NOT send email verification or password-reset messages yet. Do not claim an address has been verified.
-- Messages are not end-to-end encrypted. Do not use this app for private or sensitive conversations.
-- No media upload, voice/video calling, push notifications, contact sync, public group discovery, admin dashboard or Android APK yet.
-- The current SQLite database and in-memory rate limiter are suitable only for a small prototype. Production requires PostgreSQL, migrations, shared rate limiting, backups, monitoring and a security review.
-- Add a real email provider only through server-side environment secrets; never commit credentials or expose private keys in frontend code.
-- Never commit real passwords, tokens, database files or personal user data.
+## محدودیت‌های مهم و کارهای باقی‌مانده
+- رمز ورود، رمز مخصوص حساب دوریاست؛ برنامه رمز واقعی Gmail/Google را نمی‌گیرد و نباید بگیرد. ورود رسمی با گوگل (OAuth) هنوز پیاده‌سازی نشده است.
+- ایمیل تأیید، کد یک‌بارمصرف و بازیابی رمز عبور هنوز فعال نیستند.
+- در نسخه وب، مرورگر فقط یک نشست فعال را در `localStorage` نگه می‌دارد؛ این محدودیت به‌تنهایی شناسه سخت‌افزاری گوشی نیست و جلوی ورود از مرورگر یا دستگاه دیگر را نمی‌گیرد.
+- فایل‌های رسانه با نام تصادفی روی مسیر `/media` ارائه می‌شوند؛ در این نسخه کنترل دسترسی رسانه به سطح گفتگو و رمزگذاری سرتاسری پیاده‌سازی نشده است. فایل حساس ارسال نکنید.
+- پیام‌ها رمزگذاری سرتاسری (E2EE) ندارند.
+- تماس صوتی/تصویری، اعلان فوری، همگام‌سازی مخاطبین، پنل مدیریت، و APK اندروید هنوز وجود ندارند.
+- پایگاه‌داده فعلی SQLite و محدودکننده درخواست درون‌حافظه‌ای برای نمونه اولیه مناسب‌اند؛ انتشار عمومی پایدار نیازمند PostgreSQL، ذخیره‌سازی رسانه امن، مهاجرت پایگاه داده، محدودکننده توزیع‌شده، پشتیبان‌گیری، پایش و بررسی امنیتی است.
+
+## امنیت
+هیچ رمز ایمیل، کلید خصوصی، توکن یا داده شخصی واقعی را در مخزن کد قرار ندهید. این نسخه برای پیام‌های حساس مناسب نیست.
