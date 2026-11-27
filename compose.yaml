@@ -1,0 +1,24 @@
+services:
+  doria:
+    build: .
+    container_name: doria-messenger
+    restart: unless-stopped
+    environment:
+      DORIA_ENV: production
+      DORIA_SECRET_KEY: ${DORIA_SECRET_KEY:?Set DORIA_SECRET_KEY in your .env file}
+      DORIA_DB_PATH: /data/doria.db
+      DORIA_UPLOAD_DIR: /data/uploads
+      PORT: "8000"
+    ports:
+      - "8000:8000"
+    volumes:
+      - doria_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  doria_data:
