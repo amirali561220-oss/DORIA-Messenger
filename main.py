@@ -26,7 +26,7 @@ auth=HTTPBearer(auto_error=False)
 rate=defaultdict(deque)
 @app.middleware("http")
 async def headers_and_limits(req:Request,call_next):
-    rules={"/login":(10,300),"/register":(30,3600),"/reports":(10,3600)}
+    rules={"/login":(10,300),"/register":(30,3600),"/reports":(10,3600),"/users/find":(10,60)}
     rule=None if os.getenv("DORIA_ENV")=="test" else rules.get(req.url.path)
     if rule and req.method=="POST":
         maxn,window=rule; ip=req.client.host if req.client else "unknown"; key=(req.url.path,ip); now=time.monotonic()
@@ -120,6 +120,16 @@ class Login(BaseModel):
     @field_validator("email")
     @classmethod
     def norm(cls,v): return v.strip().lower()
+class FindUser(BaseModel):
+    email:str=Field(min_length=5,max_length=254)
+    @field_validator("email")
+    @classmethod
+    def email_ok(cls,v):
+        v=v.strip().lower()
+        if not re.fullmatch(r"[A-Za-z0-9.!#$%&'*+/=?^_{|}~-]+@[A-Za-z0-9.-]+[.][A-Za-z]{2,}",v):
+            raise ValueError("ایمیل معتبر نیست.")
+        return v
+
 class Msg(BaseModel):
     body:str=Field(min_length=1,max_length=4000)
     @field_validator("body")
@@ -185,6 +195,14 @@ def users(u=Depends(me)):
     with db() as c:
         rows=c.execute("""SELECT id,email,display_name FROM users WHERE id<>? AND id NOT IN(SELECT blocked_id FROM blocks WHERE blocker_id=?) AND id NOT IN(SELECT blocker_id FROM blocks WHERE blocked_id=?) ORDER BY id DESC LIMIT 200""",(u["id"],u["id"],u["id"])).fetchall()
     return [dict(x) for x in rows]
+@app.post("/users/find")
+def find_user(x:FindUser,u=Depends(me)):
+    with db() as c:
+        row=c.execute("SELECT id,email,display_name FROM users WHERE email=?",(x.email,)).fetchone()
+        if not row or row["id"]==u["id"] or isblocked(c,u["id"],row["id"]):
+            raise HTTPException(404,"با این ایمیل، کاربر قابل دسترسی پیدا نشد.")
+    return dict(row)
+
 @app.get("/messages/{other}")
 def messages(other:int,u=Depends(me)):
     with db() as c:
