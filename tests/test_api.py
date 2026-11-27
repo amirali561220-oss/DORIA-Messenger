@@ -34,9 +34,9 @@ def test_email_register_login_and_private_chat():
 
 def test_duplicate_and_invalid_registration():
     register("duplicate@example.com")
-    duplicate=client.post("/register",json={"email":"duplicate@example.com","display_name":"Again","password":"strong-test-pass-123"})
+    duplicate=client.post("/register",json={"email":"duplicate@example.com","display_name":"Again","password":"strong-test-pass-123","device_id":"duplicate-device-identifier-123"})
     assert duplicate.status_code==409
-    invalid=client.post("/register",json={"email":"not-an-email","display_name":"Bad","password":"strong-test-pass-123"})
+    invalid=client.post("/register",json={"email":"not-an-email","display_name":"Bad","password":"strong-test-pass-123","device_id":"invalid-device-identifier-123"})
     assert invalid.status_code==422
 
 def test_auth_and_blocking():
