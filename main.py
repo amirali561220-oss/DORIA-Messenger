@@ -65,6 +65,7 @@ def init():
         CREATE TABLE IF NOT EXISTS group_messages(id INTEGER PRIMARY KEY,group_id INTEGER REFERENCES groups_table(id) ON DELETE CASCADE,sender_id INTEGER REFERENCES users(id),body TEXT NOT NULL,created_at TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS blocks(blocker_id INTEGER REFERENCES users(id),blocked_id INTEGER REFERENCES users(id),created_at TEXT,PRIMARY KEY(blocker_id,blocked_id));
         CREATE TABLE IF NOT EXISTS reports(id INTEGER PRIMARY KEY,reporter_id INTEGER REFERENCES users(id),reported_user_id INTEGER REFERENCES users(id),reason TEXT,details TEXT,created_at TEXT);
+        CREATE TABLE IF NOT EXISTS sessions(id TEXT PRIMARY KEY,user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,device_id TEXT NOT NULL UNIQUE,created_at TEXT NOT NULL,last_seen TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS idx_msg_pair ON messages(sender_id,receiver_id,id);
         CREATE INDEX IF NOT EXISTS idx_group_msg ON group_messages(group_id,id);
         """)
@@ -77,19 +78,27 @@ def checkpw(p,stored):
     try:
         s,d=stored.split(":",1); return secrets.compare_digest(hashpw(p,bytes.fromhex(s)).split(":",1)[1],d)
     except Exception: return False
-def token(uid):
-    t=datetime.now(timezone.utc); return jwt.encode({"sub":str(uid),"iat":t,"exp":t+timedelta(hours=48)},SECRET,algorithm="HS256")
+def token(uid,device_id):
+    sid=secrets.token_urlsafe(24)
+    with db() as c:
+        c.execute("INSERT INTO sessions(id,user_id,device_id,created_at,last_seen) VALUES(?,?,?,?,?) ON CONFLICT(device_id) DO UPDATE SET id=excluded.id,user_id=excluded.user_id,created_at=excluded.created_at,last_seen=excluded.last_seen",(sid,uid,device_id,now(),now()))
+    t=datetime.now(timezone.utc)
+    return jwt.encode({"sub":str(uid),"sid":sid,"iat":t,"exp":t+timedelta(hours=48)},SECRET,algorithm="HS256")
 def me(credentials:HTTPAuthorizationCredentials=Depends(auth)):
     if not credentials: raise HTTPException(401,"ابتدا وارد حساب شوید.")
-    try: uid=int(jwt.decode(credentials.credentials,SECRET,algorithms=["HS256"])["sub"])
+    try:
+        payload=jwt.decode(credentials.credentials,SECRET,algorithms=["HS256"]); uid=int(payload["sub"]); sid=payload["sid"]
     except Exception: raise HTTPException(401,"نشست نامعتبر یا منقضی شده است.")
-    with db() as c: row=c.execute("SELECT id,email,display_name,created_at FROM users WHERE id=?",(uid,)).fetchone()
+    with db() as c:
+        active=c.execute("SELECT id FROM sessions WHERE id=? AND user_id=?",(sid,uid)).fetchone()
+        row=c.execute("SELECT id,email,display_name,created_at FROM users WHERE id=?",(uid,)).fetchone() if active else None
     if not row: raise HTTPException(401,"حساب پیدا نشد.")
     return dict(row)
 def isblocked(c,a,b):
     return c.execute("SELECT 1 FROM blocks WHERE (blocker_id=? AND blocked_id=?) OR (blocker_id=? AND blocked_id=?)",(a,b,b,a)).fetchone() is not None
 
 class Register(BaseModel):
+    device_id:str=Field(min_length=20,max_length=100)
     email:str=Field(min_length=5,max_length=254)
     display_name:str=Field(min_length=1,max_length=40)
     password:str=Field(min_length=10,max_length=128)
@@ -105,6 +114,7 @@ class Register(BaseModel):
         if not v.strip(): raise ValueError("نام نمایشی را وارد کنید.")
         return v.strip()
 class Login(BaseModel):
+    device_id:str=Field(min_length=20,max_length=100)
     email:str
     password:str
     @field_validator("email")
@@ -157,12 +167,17 @@ def register(x:Register):
             else:
                 uid=c.execute("INSERT INTO users(email,display_name,password_hash,created_at) VALUES(?,?,?,?)",(x.email,x.display_name,hashpw(x.password),now())).lastrowid
         except sqlite3.IntegrityError: raise HTTPException(409,"این ایمیل قبلاً ثبت شده است.")
-    return {"access_token":token(uid),"user_id":uid}
+    return {"access_token":token(uid,x.device_id),"user_id":uid}
 @app.post("/login")
 def login(x:Login):
     with db() as c: u=c.execute("SELECT id,password_hash FROM users WHERE email=?",(x.email,)).fetchone()
     if not u or not checkpw(x.password,u["password_hash"]): raise HTTPException(401,"ایمیل یا رمز عبور اشتباه است.")
-    return {"access_token":token(u["id"]),"token_type":"bearer"}
+    return {"access_token":token(u["id"],x.device_id),"token_type":"bearer"}
+@app.post("/logout")
+def logout(u=Depends(me),credentials:HTTPAuthorizationCredentials=Depends(auth)):
+    payload=jwt.decode(credentials.credentials,SECRET,algorithms=["HS256"])
+    with db() as c: c.execute("DELETE FROM sessions WHERE id=?",(payload["sid"],))
+    return {"logged_out":True}
 @app.get("/me")
 def profile(u=Depends(me)): return u
 @app.get("/users")
