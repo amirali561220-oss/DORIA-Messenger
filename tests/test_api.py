@@ -34,6 +34,18 @@ def test_email_register_login_and_private_chat():
     rows=client.get(f"/messages/{uid1}",headers=h2)
     assert rows.status_code==200 and rows.json()[0]["body"]=="سلام دوریا"
 
+def test_find_friend_by_exact_email():
+    _,headers=register("finder@example.com")
+    target_id,_=register("friend@example.com")
+    found=client.post("/users/find",headers=headers,json={"email":" FRIEND@example.com "})
+    assert found.status_code==200
+    assert found.json()["id"]==target_id
+    assert found.json()["display_name"]=="friend"
+    missing=client.post("/users/find",headers=headers,json={"email":"missing@example.com"})
+    assert missing.status_code==404
+    unauth=client.post("/users/find",json={"email":"friend@example.com"})
+    assert unauth.status_code==401
+
 def test_duplicate_and_invalid_registration():
     register("duplicate@example.com")
     duplicate=client.post("/register",json={"email":"duplicate@example.com","display_name":"Again","password":"strong-test-pass-123","device_id":"duplicate-device-identifier-123"})
